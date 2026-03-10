@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>切水果 - Fruit Slicer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: linear-gradient(180deg, #87CEEB 0%, #E0F6FF 50%, #90EE90 100%);
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        /* 生命值显示 */
+        #lives {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+
+        .heart {
+            width: 35px;
+            height: 35px;
+            font-size: 30px;
+            filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.3));
+            animation: heartbeat 1.5s infinite;
+        }
+
+        .heart.empty {
+            opacity: 0.3;
+            filter: grayscale(100%);
+        }
+
+        @keyframes heartbeat {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 分数显示 */
+        #score {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 32px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            z-index: 10;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 20px;
+            border-radius: 20px;
+            border: 3px solid #FFA500;
+        }
+
+        /* 速度指示器 */
+        #speedIndicator {
+            position: absolute;
+            top: 65px;
+            right: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00FF00;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 2px solid #00FF00;
+        }
+
+        /* 体积指示器 */
+        #sizeIndicator {
+            position: absolute;
+            top: 115px;
+            right: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #FF69B4;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 15px;
+            border: 2px solid #FF69B4;
+        }
+
+        /* 游戏开始/结束屏幕 */
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.8);
+            z-index: 20;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .screen h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            background: linear-gradient(45deg, #FFD700, #FFA500, #FF6347);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .screen p {
+            font-size: 18px;
+            margin: 10px 0;
+            opacity: 0.9;
+        }
+
+        .btn {
+            margin-top: 30px;
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s;
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        /* 粑粑遮挡层 */
+        #poopOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+        }
+
+        .poop-stain {
+            position: absolute;
+            background: radial-gradient(circle, rgba(139,69,19,0.4) 0%, rgba(139,69,19,0.2) 70%, transparent 100%);
+            border-radius: 50%;
+            filter: blur(2px);
+        }
+
+        /* 520彩蛋 */
+        #easterEgg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #ff0066 0%, #ff3399 50%, #ff66cc 100%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+            overflow: hidden;
+        }
+
+        .love-text {
+            font-size: 56px;
+            font-weight: bold;
+            color: #ff0000;
+            text-shadow: 4px 4px 8px rgba(0,0,0,0.5), 0 0 20px #ff6666;
+            margin-bottom: 20px;
+            animation: lovePulse 1.5s infinite;
+            z-index: 2;
+        }
+
+        .gift-text {
+            font-size: 24px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 2;
+        }
+
+        @keyframes lovePulse {
+            0%, 100% { transform: scale(1) rotate(-2deg); }
+            50% { transform: scale(1.1) rotate(2deg); }
+        }
+
+        .rose, .heart-icon {
+            position: absolute;
+            font-size: 30px;
+            animation: float 3s infinite ease-in-out;
+            opacity: 0.8;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(10deg); }
+        }
+
+        /* 切割线效果 */
+        .slash-line {
+            position: absolute;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, white, transparent);
+            pointer-events: none;
+            z-index: 15;
+            animation: slashFade 0.3s forwards;
+        }
+
+        @keyframes slashFade {
+            0% { opacity: 1; transform: scaleX(0); }
+            50% { opacity: 1; transform: scaleX(1); }
+            100% { opacity: 0; transform: scaleX(1); }
+        }
+
+        /* 特殊效果文字 */
+        .combo-text {
+            position: absolute;
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 15;
+            animation: comboFloat 1s forwards;
+        }
+
+        @keyframes comboFloat {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+
+        /* 横屏提示 */
+        #landscapeHint {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #landscapeHint.show {
+            display: flex;
+        }
+
+        .landscape-icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+            animation: rotate 2s infinite;
+        }
+
+        @keyframes rotate {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(90deg); }
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 600px) {
+            .screen h1 { font-size: 36px; }
+            .screen p { font-size: 16px; }
+            .btn { padding: 12px 30px; font-size: 20px; }
+            #score { font-size: 24px; padding: 6px 15px; top: 10px; right: 10px; }
+            #speedIndicator { font-size: 14px; padding: 4px 10px; top: 55px; right: 10px; }
+            #sizeIndicator { font-size: 14px; padding: 4px 10px; top: 95px; right: 10px; }
+            .heart { width: 30px; height: 30px; font-size: 26px; }
+            .love-text { font-size: 42px; }
+            .gift-text { font-size: 20px; }
+        }
+
+        /* 横屏适配 - 手机 */
+        @media (orientation: landscape) and (max-width: 900px) {
+            #score {
+                font-size: 22px;
+                padding: 6px 12px;
+                top: 8px;
+                right: 8px;
+                min-width: 80px;
+            }
+            #speedIndicator {
+                font-size: 13px;
+                padding: 3px 8px;
+                top: 42px;
+                right: 8px;
+                background: rgba(0,0,0,0.4);
+            }
+            #sizeIndicator {
+                font-size: 13px;
+                padding: 3px 8px;
+                top: 72px;
+                right: 8px;
+                background: rgba(0,0,0,0.4);
+            }
+            #lives {
+                top: 8px;
+                left: 8px;
+                gap: 4px;
+                flex-direction: row;
+            }
+            .heart {
+                width: 28px;
+                height: 28px;
+                font-size: 24px;
+            }
+            .screen h1 { font-size: 32px; }
+            .screen p { font-size: 14px; }
+            .btn { padding: 10px 25px; font-size: 18px; }
+            .love-text { font-size: 36px; }
+            .gift-text { font-size: 18px; }
+        }
+
+        /* 横屏适配 - 平板/大屏 */
+        @media (orientation: landscape) and (min-width: 901px) {
+            #score { font-size: 24px; padding: 8px 16px; top: 10px; right: 15px; }
+            #speedIndicator { font-size: 15px; padding: 5px 12px; top: 50px; right: 15px; }
+            #sizeIndicator { font-size: 15px; padding: 5px 12px; top: 90px; right: 15px; }
+            #lives { top: 10px; left: 15px; gap: 8px; }
+            .heart { width: 35px; height: 35px; font-size: 32px; }
+            .screen h1 { font-size: 48px; }
+            .screen p { font-size: 18px; }
+            .btn { padding: 15px 40px; font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- 横屏提示 -->
+        <div id="landscapeHint">
+            <div class="landscape-icon">📱</div>
+            <h2>请旋转手机到横屏</h2>
+            <p>横屏体验更佳</p>
+        </div>
+
+        <!-- 生命值 -->
+        <div id="lives">
+            <div class="heart">❤️</div>
+            <div class="heart">❤️</div>
+            <div class="heart">❤️</div>
+        </div>
+
+        <!-- 分数 -->
+        <div id="score">0</div>
+
+        <!-- 速度指示器 -->
+        <div id="speedIndicator">速度: 1.0x</div>
+
+        <!-- 体积指示器 -->
+        <div id="sizeIndicator">体积: 大</div>
+
+        <!-- 粑粑遮挡层 -->
+        <div id="poopOverlay"></div>
+
+        <!-- 520彩蛋 -->
+        <div id="easterEgg">
+            <div class="love-text">"爱你宝宝"</div>
+            <div class="gift-text">截图有礼物哦</div>
+        </div>
+
+        <!-- 开始屏幕 -->
+        <div id="startScreen" class="screen">
+            <h1>🍉 切水果 🍓</h1>
+            <p>🎯 切割水果获得分数</p>
+            <p>💣 避开炸弹</p>
+            <p>💩 小心粑粑</p>
+            <p>❤️ 3滴血，别让水果掉落</p>
+            <p>💖 520分有惊喜</p>
+            <button class="btn" onclick="startGame()">开始游戏</button>
+        </div>
+
+        <!-- 游戏结束屏幕 -->
+        <div id="gameOverScreen" class="screen" style="display: none;">
+            <h1>游戏结束</h1>
+            <p id="finalScore">最终得分: 0</p>
+            <button class="btn" onclick="restartGame()">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        // 游戏状态
+        const game = {
+            running: false,
+            score: 0,
+            lives: 3,
+            canvas: null,
+            ctx: null,
+            width: 0,
+            height: 0,
+            fruits: [],
+            particles: [],
+            slashLines: [],
+            isLandscape: false,
+            poopActive: false,
+            poopTimer: 0,
+            lastSlash: null,
+            easterEggShown: false,
+            startTime: 0,
+            speedMultiplier: 1.0
+        };
+
+        // 水果类型
+        const fruitTypes = [
+            { name: 'apple', emoji: '🍎', color: '#FF4444', juice: '#FF6B6B', weight: 1 },
+            { name: 'orange', emoji: '🍊', color: '#FFA500', juice: '#FFB347', weight: 1 },
+            { name: 'banana', emoji: '🍌', color: '#FFE135', juice: '#FFFACD', weight: 1 },
+            { name: 'watermelon', emoji: '🍉', color: '#FF3B30', juice: '#FF6B6B', weight: 1.2 },
+            { name: 'grape', emoji: '🍇', color: '#8B4513', juice: '#9370DB', weight: 0.8 },
+            { name: 'strawberry', emoji: '🍓', color: '#FF1493', juice: '#FF69B4', weight: 0.7 },
+            { name: 'pineapple', emoji: '🍍', color: '#FFD700', juice: '#FFA500', weight: 1.1 },
+            { name: 'cherry', emoji: '🍒', color: '#DC143C', juice: '#FF6347', weight: 0.6 }
+        ];
+
+        // 特殊水果
+        const specialFruit = { name: 'special', emoji: '⭐', color: '#FFD700', juice: '#FFA500', weight: 1.5 };
+
+        // 炸弹
+        const bomb = { name: 'bomb', emoji: '💣', color: '#2C2C2C', juice: '#000000', weight: 1.2 };
+
+        // 粑粑
+        const poop = { name: 'poop', emoji: '💩', color: '#8B4513', juice: '#654321', weight: 1.1 };
+
+        // 初始化
+        function init() {
+            game.canvas = document.getElementById('gameCanvas');
+            game.ctx = game.canvas.getContext('2d');
+
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            // 触摸/鼠标事件
+            game.canvas.addEventListener('mousedown', handleStart);
+            game.canvas.addEventListener('mousemove', handleMove);
+            game.canvas.addEventListener('mouseup', handleEnd);
+            game.canvas.addEventListener('touchstart', handleStart);
+            game.canvas.addEventListener('touchmove', handleMove);
+            game.canvas.addEventListener('touchend', handleEnd);
+
+            // 横屏检测
+            checkOrientation();
+            window.addEventListener('resize', checkOrientation);
+            window.addEventListener('orientationchange', checkOrientation);
+        }
+
+        function resizeCanvas() {
+            game.width = game.canvas.width = window.innerWidth;
+            game.height = game.canvas.height = window.innerHeight;
+        }
+
+        function checkOrientation() {
+            const isLandscape = window.innerWidth > window.innerHeight;
+            game.isLandscape = isLandscape;
+
+            const hint = document.getElementById('landscapeHint');
+            // 手机竖屏时显示提示（宽度小于768px）
+            if (!isLandscape && window.innerWidth < 768) {
+                hint.classList.add('show');
+            } else {
+                hint.classList.remove('show');
+            }
+
+            // 横屏时调整画布大小，确保比例正确
+            if (isLandscape) {
+                // 横屏时，确保画布高度不会太小
+                const minHeight = Math.min(window.innerHeight, 500);
+                if (window.innerHeight < 500) {
+                    game.canvas.style.height = minHeight + 'px';
+                    game.canvas.style.marginTop = ((window.innerHeight - minHeight) / 2) + 'px';
+                } else {
+                    game.canvas.style.height = '100%';
+                    game.canvas.style.marginTop = '0';
+                }
+            } else {
+                // 竖屏时恢复默认
+                game.canvas.style.height = '100%';
+                game.canvas.style.marginTop = '0';
+            }
+        }
+
+        // 开始游戏
+        function startGame() {
+            game.running = true;
+            game.score = 0;
+            game.lives = 3;
+            game.fruits = [];
+            game.particles = [];
+            game.slashLines = [];
+            game.poopActive = false;
+            game.poopTimer = 0;
+            game.easterEggShown = false;
+            game.startTime = Date.now();
+            game.speedMultiplier = 1.0;
+
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            document.getElementById('poopOverlay').style.display = 'none';
+            document.getElementById('easterEgg').style.display = 'none';
+
+            updateUI();
+            gameLoop();
+            spawnFruits();
+        }
+
+        // 重新开始
+        function restartGame() {
+            startGame();
+        }
+
+        // 生成水果
+        function spawnFruits() {
+            if (!game.running) return;
+
+            // 随机生成
+            const rand = Math.random();
+            let fruit;
+
+            if (rand < 0.05) {
+                // 5% 概率特殊水果
+                fruit = { ...specialFruit };
+                fruit.score = 50;
+                fruit.isSpecial = true;
+            } else if (rand < 0.15) {
+                // 10% 概率炸弹
+                fruit = { ...bomb };
+                fruit.isBomb = true;
+            } else if (rand < 0.22) {
+                // 7% 概率粑粑
+                fruit = { ...poop };
+                fruit.isPoop = true;
+            } else if (rand < 0.33) {
+                // 11% 概率惊喜水果（调整为18%）
+                fruit = { ...specialFruit };
+                fruit.score = 50;
+                fruit.isSpecial = true;
+            } else {
+                // 普通水果
+                const type = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
+                fruit = { ...type };
+                fruit.score = 10;
+            }
+
+            // 水果从屏幕最底部开始，以抛物线运动到屏幕上方五分之一处
+            const x = Math.random() * (game.width - 60) + 30;
+            const y = game.height - 20; // 从屏幕最底部开始（确保在屏幕内）
+
+            // 慢速运动
+            const baseSpeed = 0.28 + Math.random() * 0.28; // 慢速：0.28-0.56
+            const speed = baseSpeed * game.speedMultiplier;
+
+            // 目标位置：屏幕上方20%（五分之一）
+            const targetY = game.height * 0.2;
+
+            // 抛物线运动计算
+            // 水果从底部向上抛出，到达目标高度后下落
+            // 水平速度：保持较大的水平移动，形成抛物线
+            const horizontalSpeed = speed * 1.5; // 更大的水平速度，增加抛物线距离
+
+            // 垂直速度：向上抛出的速度
+            // 调整系数，让水果能到达屏幕上方五分之一处
+            const verticalSpeed = -Math.sqrt(2 * 0.3 * (game.height - targetY)) * speed * 0.9;
+
+            // 体积随时间变化 - 前期大，后期小
+            // 0分钟: 1.69倍, 1分钟: 1.56倍, 2分钟: 1.43倍, 3分钟+: 1.3倍
+            // 水果体积增加30%：基础体积从1.3调整为1.69
+            const elapsedMinutes = (Date.now() - game.startTime) / 60000;
+            let sizeMultiplier = 1.69 - (elapsedMinutes * 0.13); // 每分钟减少0.13，保持30%增加
+            if (sizeMultiplier < 1.3) sizeMultiplier = 1.3; // 最小1.3倍（比原来大30%）
+
+            // 特殊水果和炸弹体积更大
+            if (fruit.isSpecial || fruit.isBomb || fruit.isPoop) {
+                sizeMultiplier *= 1.2;
+            }
+
+            game.fruits.push({
+                ...fruit,
+                x: x,
+                y: y,
+                vx: (Math.random() - 0.5) * horizontalSpeed, // 随机水平移动
+                vy: verticalSpeed, // 向上抛出
+                radius: 25 * sizeMultiplier, // 体积变化
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 0.2,
+                sliced: false,
+                life: 0,
+                targetY: targetY, // 保存目标位置
+                gravity: 0.15 * speed // 重力加速度，影响抛物线形状
+            });
+
+            // 继续生成
+            const nextSpawn = 800 + Math.random() * 1200;
+            setTimeout(spawnFruits, nextSpawn);
+        }
+
+        // 游戏主循环
+        function gameLoop() {
+            if (!game.running) return;
+
+            update();
+            render();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 更新
+        function update() {
+            // 更新速度倍率（每分钟提高10%）
+            const elapsedMinutes = (Date.now() - game.startTime) / 60000;
+            game.speedMultiplier = 1.0 + (elapsedMinutes * 0.1);
+
+            // 更新水果
+            for (let i = game.fruits.length - 1; i >= 0; i--) {
+                const fruit = game.fruits[i];
+
+                if (!fruit.sliced) {
+                    // 物理运动 - 抛物线
+                    fruit.vy += fruit.gravity; // 重力加速度
+                    fruit.x += fruit.vx;
+                    fruit.y += fruit.vy;
+                    fruit.rotation += fruit.rotationSpeed;
+                    fruit.life++;
+
+                    // 检查是否掉落（超出屏幕底部）
+                    if (fruit.y > game.height + 50) {
+                        if (!fruit.isBomb && !fruit.isPoop) {
+                            game.lives--;
+                            updateUI();
+                            if (game.lives <= 0) {
+                                gameOver();
+                            }
+                        }
+                        game.fruits.splice(i, 1);
+                        continue;
+                    }
+                } else {
+                    // 切割后的碎片
+                    fruit.x += fruit.vx;
+                    fruit.y += fruit.vy;
+                    fruit.vx *= 0.98;
+                    fruit.vy *= 0.98;
+                    fruit.rotation += fruit.rotationSpeed;
+                    fruit.life++;
+
+                    if (fruit.life > 60) {
+                        game.fruits.splice(i, 1);
+                    }
+                }
+            }
+
+            // 更新粒子
+            for (let i = game.particles.length - 1; i >= 0; i--) {
+                const p = game.particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.2;
+                p.life--;
+                p.alpha -= 0.02;
+
+                if (p.life <= 0 || p.alpha <= 0) {
+                    game.particles.splice(i, 1);
+                }
+            }
+
+            // 更新切割线
+            for (let i = game.slashLines.length - 1; i >= 0; i--) {
+                game.slashLines[i].life--;
+                if (game.slashLines[i].life <= 0) {
+                    game.slashLines.splice(i, 1);
+                }
+            }
+
+            // 粑粑遮挡计时
+            if (game.poopActive) {
+                game.poopTimer--;
+                if (game.poopTimer <= 0) {
+                    game.poopActive = false;
+                    document.getElementById('poopOverlay').style.display = 'none';
+                }
+            }
+
+            // 检查520分彩蛋
+            if (game.score >= 520 && !game.easterEggShown) {
+                showEasterEgg();
+            }
+        }
+
+        // 渲染
+        function render() {
+            const ctx = game.ctx;
+            ctx.clearRect(0, 0, game.width, game.height);
+
+            // 绘制水果
+            game.fruits.forEach(fruit => {
+                if (fruit.sliced) {
+                    // 绘制切割后的碎片
+                    ctx.save();
+                    ctx.translate(fruit.x, fruit.y);
+                    ctx.rotate(fruit.rotation);
+                    ctx.globalAlpha = fruit.alpha || 1;
+                    const fontSize = fruit.radius * 1.6; // 根据半径调整字体大小
+                    ctx.font = `${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(fruit.emoji, 0, 0);
+                    ctx.restore();
+                } else {
+                    // 绘制完整水果
+                    ctx.save();
+                    ctx.translate(fruit.x, fruit.y);
+                    ctx.rotate(fruit.rotation);
+                    const fontSize = fruit.radius * 2; // 根据半径调整字体大小
+                    ctx.font = `${fontSize}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+
+                    // 特殊水果发光效果
+                    if (fruit.isSpecial) {
+                        ctx.shadowColor = '#FFD700';
+                        ctx.shadowBlur = 20;
+                    }
+
+                    // 炸弹发光效果
+                    if (fruit.isBomb) {
+                        ctx.shadowColor = '#FF0000';
+                        ctx.shadowBlur = 15;
+                    }
+
+                    ctx.fillText(fruit.emoji, 0, 0);
+                    ctx.restore();
+                }
+            });
+
+            // 绘制粒子（汤汁）
+            game.particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 绘制切割线
+            game.slashLines.forEach(line => {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(line.x1, line.y1);
+                ctx.lineTo(line.x2, line.y2);
+                ctx.stroke();
+                ctx.restore();
+            });
+        }
+
+        // 切割检测
+        function checkSlice(x, y) {
+            for (let i = 0; i < game.fruits.length; i++) {
+                const fruit = game.fruits[i];
+                if (fruit.sliced) continue;
+
+                const dist = Math.sqrt((fruit.x - x) ** 2 + (fruit.y - y) ** 2);
+
+                // 切割范围随水果大小变化
+                const sliceRange = fruit.radius + (fruit.radius * 0.4);
+
+                if (dist < sliceRange) {
+                    // 切割成功
+                    sliceFruit(fruit, i, x, y);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 切割水果
+        function sliceFruit(fruit, index, x, y) {
+            fruit.sliced = true;
+
+            if (fruit.isBomb) {
+                // 切到炸弹
+                game.lives--;
+                updateUI();
+                showComboText(x, y, '💣 炸弹!', '#FF0000');
+                createParticles(x, y, '#000000', 30);
+                
+                if (game.lives <= 0) {
+                    gameOver();
+                }
+            } else if (fruit.isPoop) {
+                // 切到粑粑 - 不扣血
+                game.poopActive = true;
+                game.poopTimer = 300; // 5秒
+                showPoopOverlay();
+                showComboText(x, y, '💩 粑粑!', '#8B4513');
+                createParticles(x, y, '#8B4513', 20);
+            } else {
+                // 切到水果
+                const score = fruit.isSpecial ? 50 : 10;
+                game.score += score;
+                updateUI();
+
+                // 显示分数
+                showComboText(x, y, `+${score}`, fruit.isSpecial ? '#FFD700' : '#FFFFFF');
+
+                // 创建汤汁粒子
+                createParticles(x, y, fruit.juice, fruit.isSpecial ? 40 : 20);
+
+                // 创建切割碎片
+                createSlicedFragments(fruit, x, y);
+            }
+
+            // 移除原水果
+            game.fruits.splice(index, 1);
+        }
+
+        // 创建切割碎片
+        function createSlicedFragments(fruit, x, y) {
+            if (fruit.isBomb || fruit.isPoop) return;
+
+            const fragmentOffset = fruit.radius * 0.4;
+
+            // 左半边
+            game.fruits.push({
+                ...fruit,
+                x: x - fragmentOffset,
+                y: y,
+                vx: fruit.vx - 2,
+                vy: fruit.vy - 2,
+                rotationSpeed: -0.3,
+                sliced: true,
+                life: 0,
+                alpha: 0.8
+            });
+
+            // 右半边
+            game.fruits.push({
+                ...fruit,
+                x: x + fragmentOffset,
+                y: y,
+                vx: fruit.vx + 2,
+                vy: fruit.vy - 2,
+                rotationSpeed: 0.3,
+                sliced: true,
+                life: 0,
+                alpha: 0.8
+            });
+        }
+
+        // 创建粒子（汤汁）
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 4;
+                game.particles.push({
+                    x: x,
+                    y: y,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - 2,
+                    color: color,
+                    size: 3 + Math.random() * 4,
+                    life: 30 + Math.random() * 20,
+                    alpha: 1
+                });
+            }
+        }
+
+        // 显示组合文字
+        function showComboText(x, y, text, color) {
+            const div = document.createElement('div');
+            div.className = 'combo-text';
+            div.textContent = text;
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            div.style.color = color;
+            document.getElementById('gameContainer').appendChild(div);
+
+            setTimeout(() => div.remove(), 1000);
+        }
+
+        // 显示粑粑遮挡
+        function showPoopOverlay() {
+            const overlay = document.getElementById('poopOverlay');
+            overlay.innerHTML = '';
+            overlay.style.display = 'block';
+
+            // 创建多个粑粑污渍
+            for (let i = 0; i < 8; i++) {
+                const stain = document.createElement('div');
+                stain.className = 'poop-stain';
+                const size = 80 + Math.random() * 120;
+                stain.style.width = size + 'px';
+                stain.style.height = size + 'px';
+                stain.style.left = Math.random() * 100 + '%';
+                stain.style.top = Math.random() * 100 + '%';
+                overlay.appendChild(stain);
+            }
+        }
+
+        // 显示520彩蛋
+        function showEasterEgg() {
+            game.easterEggShown = true;
+            const egg = document.getElementById('easterEgg');
+            egg.style.display = 'flex';
+
+            // 创建玫瑰和爱心
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const icon = document.createElement('div');
+                    icon.className = Math.random() > 0.5 ? 'rose' : 'heart-icon';
+                    icon.textContent = Math.random() > 0.5 ? '🌹' : '💖';
+                    icon.style.left = Math.random() * 100 + '%';
+                    icon.style.top = Math.random() * 100 + '%';
+                    icon.style.fontSize = (20 + Math.random() * 30) + 'px';
+                    icon.style.animationDelay = Math.random() * 2 + 's';
+                    egg.appendChild(icon);
+                }, i * 100);
+            }
+
+            // 5秒后自动关闭
+            setTimeout(() => {
+                egg.style.display = 'none';
+                // 清理添加的图标
+                const icons = egg.querySelectorAll('.rose, .heart-icon');
+                icons.forEach(icon => icon.remove());
+            }, 5000);
+        }
+
+        // 游戏结束
+        function gameOver() {
+            game.running = false;
+            document.getElementById('finalScore').textContent = `最终得分: ${game.score}`;
+            document.getElementById('gameOverScreen').style.display = 'flex';
+        }
+
+        // 更新UI
+        function updateUI() {
+            document.getElementById('score').textContent = game.score;
+
+            // 更新速度显示
+            const speedText = game.speedMultiplier.toFixed(1) + 'x';
+            document.getElementById('speedIndicator').textContent = `速度: ${speedText}`;
+
+            // 更新体积显示
+            const elapsedMinutes = (Date.now() - game.startTime) / 60000;
+            let sizeMultiplier = 1.3 - (elapsedMinutes * 0.1);
+            if (sizeMultiplier < 1.0) sizeMultiplier = 1.0;
+
+            let sizeText = '';
+            if (sizeMultiplier >= 1.25) sizeText = '超大';
+            else if (sizeMultiplier >= 1.15) sizeText = '大';
+            else if (sizeMultiplier >= 1.05) sizeText = '中';
+            else sizeText = '小';
+
+            document.getElementById('sizeIndicator').textContent = `体积: ${sizeText}`;
+
+            const hearts = document.querySelectorAll('.heart');
+            hearts.forEach((heart, index) => {
+                if (index < game.lives) {
+                    heart.classList.remove('empty');
+                } else {
+                    heart.classList.add('empty');
+                }
+            });
+        }
+
+        // 处理开始
+        function handleStart(e) {
+            if (!game.running) return;
+            e.preventDefault();
+            
+            const pos = getEventPos(e);
+            game.lastSlash = pos;
+        }
+
+        // 处理移动
+        function handleMove(e) {
+            if (!game.running) return;
+            e.preventDefault();
+            
+            const pos = getEventPos(e);
+            
+            if (game.lastSlash) {
+                // 检查切割
+                checkSlice(pos.x, pos.y);
+                
+                // 添加切割线
+                game.slashLines.push({
+                    x1: game.lastSlash.x,
+                    y1: game.lastSlash.y,
+                    x2: pos.x,
+                    y2: pos.y,
+                    life: 10
+                });
+            }
+            
+            game.lastSlash = pos;
+        }
+
+        // 处理结束
+        function handleEnd(e) {
+            if (!game.running) return;
+            e.preventDefault();
+            game.lastSlash = null;
+        }
+
+        // 获取事件位置
+        function getEventPos(e) {
+            const rect = game.canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        // 启动
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
